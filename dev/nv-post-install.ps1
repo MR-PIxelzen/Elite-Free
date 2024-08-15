@@ -1,3 +1,9 @@
+#nvidia driver auto installation script by zoic
+
+If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
+    Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
+    Exit	
+}
 
 #run powershell as trusted installer credit : https://github.com/AveYo/LeanAndMean
 #added -wait to prevent script from continuing too fast
@@ -33,6 +39,156 @@ function RunAsTI($cmd, $arg) {
     Start-Process powershell -args "-win 1 -nop -c `n$V `$env:R=(gi `$key -ea 0).getvalue(`$id)-join''; iex `$env:R" -verb runas -Wait
 } # lean & mean snippet by AveYo, 2022.01.28
 
+
+# download file function source: https://gist.github.com/ChrisStro/37444dd012f79592080bd46223e27adc
+function Get-FileFromWeb {
+    param (
+        # Parameter help description
+        [Parameter(Mandatory)]
+        [string]$URL,
+  
+        # Parameter help description
+        [Parameter(Mandatory)]
+        [string]$File 
+    )
+    Begin {
+        function Show-Progress {
+            param (
+                # Enter total value
+                [Parameter(Mandatory)]
+                [Single]$TotalValue,
+        
+                # Enter current value
+                [Parameter(Mandatory)]
+                [Single]$CurrentValue,
+        
+                # Enter custom progresstext
+                [Parameter(Mandatory)]
+                [string]$ProgressText,
+        
+                # Enter value suffix
+                [Parameter()]
+                [string]$ValueSuffix,
+        
+                # Enter bar lengh suffix
+                [Parameter()]
+                [int]$BarSize = 40,
+
+                # show complete bar
+                [Parameter()]
+                [switch]$Complete
+            )
+            
+            # calc %
+            $percent = $CurrentValue / $TotalValue
+            $percentComplete = $percent * 100
+            if ($ValueSuffix) {
+                $ValueSuffix = " $ValueSuffix" # add space in front
+            }
+            if ($psISE) {
+                Write-Progress "$ProgressText $CurrentValue$ValueSuffix of $TotalValue$ValueSuffix" -id 0 -percentComplete $percentComplete            
+            }
+            else {
+                # build progressbar with string function
+                $curBarSize = $BarSize * $percent
+                $progbar = ''
+                $progbar = $progbar.PadRight($curBarSize, [char]9608)
+                $progbar = $progbar.PadRight($BarSize, [char]9617)
+        
+                if (!$Complete.IsPresent) {
+                    Write-Host -NoNewLine "`r$ProgressText $progbar [ $($CurrentValue.ToString('#.###').PadLeft($TotalValue.ToString('#.###').Length))$ValueSuffix / $($TotalValue.ToString('#.###'))$ValueSuffix ] $($percentComplete.ToString('##0.00').PadLeft(6)) % complete"
+                }
+                else {
+                    Write-Host -NoNewLine "`r$ProgressText $progbar [ $($TotalValue.ToString('#.###').PadLeft($TotalValue.ToString('#.###').Length))$ValueSuffix / $($TotalValue.ToString('#.###'))$ValueSuffix ] $($percentComplete.ToString('##0.00').PadLeft(6)) % complete"                    
+                }                
+            }   
+        }
+    }
+    Process {
+        try {
+            $storeEAP = $ErrorActionPreference
+            $ErrorActionPreference = 'Stop'
+        
+            # invoke request
+            $request = [System.Net.HttpWebRequest]::Create($URL)
+            $response = $request.GetResponse()
+  
+            if ($response.StatusCode -eq 401 -or $response.StatusCode -eq 403 -or $response.StatusCode -eq 404) {
+                throw "Remote file either doesn't exist, is unauthorized, or is forbidden for '$URL'."
+            }
+  
+            if ($File -match '^\.\\') {
+                $File = Join-Path (Get-Location -PSProvider 'FileSystem') ($File -Split '^\.')[1]
+            }
+            
+            if ($File -and !(Split-Path $File)) {
+                $File = Join-Path (Get-Location -PSProvider 'FileSystem') $File
+            }
+
+            if ($File) {
+                $fileDirectory = $([System.IO.Path]::GetDirectoryName($File))
+                if (!(Test-Path($fileDirectory))) {
+                    [System.IO.Directory]::CreateDirectory($fileDirectory) | Out-Null
+                }
+            }
+
+            [long]$fullSize = $response.ContentLength
+            $fullSizeMB = $fullSize / 1024 / 1024
+  
+            # define buffer
+            [byte[]]$buffer = new-object byte[] 1048576
+            [long]$total = [long]$count = 0
+  
+            # create reader / writer
+            $reader = $response.GetResponseStream()
+            $writer = new-object System.IO.FileStream $File, 'Create'
+  
+            # start download
+            $finalBarCount = 0 #show final bar only one time
+            do {
+          
+                $count = $reader.Read($buffer, 0, $buffer.Length)
+          
+                $writer.Write($buffer, 0, $count)
+              
+                $total += $count
+                $totalMB = $total / 1024 / 1024
+          
+                if ($fullSize -gt 0) {
+                    Show-Progress -TotalValue $fullSizeMB -CurrentValue $totalMB -ProgressText "Downloading $($File.Name)" -ValueSuffix 'MB'
+                }
+
+                if ($total -eq $fullSize -and $count -eq 0 -and $finalBarCount -eq 0) {
+                    Show-Progress -TotalValue $fullSizeMB -CurrentValue $totalMB -ProgressText "Downloading $($File.Name)" -ValueSuffix 'MB' -Complete
+                    $finalBarCount++
+                    #Write-Host "$finalBarCount"
+                }
+
+            } while ($count -gt 0)
+        }
+  
+        catch {
+        
+            $ExeptionMsg = $_.Exception.Message
+            Write-Host "Download breaks with error : $ExeptionMsg"
+        }
+  
+        finally {
+            # cleanup
+            if ($reader) { $reader.Close() }
+            if ($writer) { $writer.Flush(); $writer.Close() }
+        
+            $ErrorActionPreference = $storeEAP
+            [GC]::Collect()
+        }    
+    }
+}
+
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+
+#getting latest driver version num
 
 #getting monitor ids and adding them to an array
 $monitorDevices = pnputil /enum-devices | Select-String -Pattern 'DISPLAY'
@@ -73,12 +229,6 @@ foreach ($monitor in $monitors) {
     $manufacturerNames += $manufacturerName
 }
 
-
-
-
-
-
-
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -93,7 +243,6 @@ $TabControl.Location = New-Object System.Drawing.Size(10, 10)
 $TabControl.Size = New-Object System.Drawing.Size(370, 350) 
 $TabControl.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
 
-
 $TabPage1 = New-Object System.Windows.Forms.TabPage
 $TabPage1.Text = 'General'
 $TabPage1.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
@@ -102,15 +251,10 @@ $TabPage2 = New-Object System.Windows.Forms.TabPage
 $TabPage2.Text = 'Digital Vibrance'
 $TabPage2.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
 
-
-   
 $TabControl.Controls.Add($TabPage1)
 $TabControl.Controls.Add($TabPage2)
 
-
-
 $Form.Controls.Add($TabControl) 
-
 
 $checkbox1 = new-object System.Windows.Forms.checkbox
 $checkbox1.Location = new-object System.Drawing.Size(10, 20)
@@ -147,7 +291,6 @@ $checkbox4.ForeColor = 'White'
 $checkbox4.Checked = $false
 $Form.Controls.Add($checkbox4)
 $TabPage1.Controls.Add($checkBox4)
-
 
 $trackbarValues = @{}
 for ($i = 0; $i -lt $dList.Length; $i++) {
@@ -200,8 +343,6 @@ for ($i = 0; $i -lt $dList.Length; $i++) {
             })
     }
 
-     
-
     # Create a new closure for each trackbar and value label pair
     $closure = $handler.GetNewClosure()
     $closure.Invoke($valueLabel, $trackBar, $trackbarValues)
@@ -209,9 +350,6 @@ for ($i = 0; $i -lt $dList.Length; $i++) {
     # Add the initial value to the trackbarValues hashtable
     $trackbarValues[$i] = $midpoint
 }
-
-
-
 
 # Create an "Apply" button
 $applyButton = New-Object System.Windows.Forms.Button
@@ -287,10 +425,14 @@ if ($dialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
         $value = $trackbarValues[$key]
         $path = $paths[$i]
         $command = "Reg.exe add $path /v `"SaturationRegistryKey`" /t REG_DWORD /d $value /f"
-        RunAsTI powershell "-nologo -windowstyle hidden -command $command"
+        Write-Host "RunAsTI powershell "-nologo -windowstyle hidden -command $command" "
         Start-Sleep 1
+        Paused
         $i++
     }
 
    
 }
+
+
+

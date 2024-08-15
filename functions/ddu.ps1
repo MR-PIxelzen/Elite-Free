@@ -19,22 +19,11 @@ Expand-Archive -Path $outputFile -DestinationPath $extractFolder
 Write-Output "Contents of the extraction folder ($extractFolder):"
 Get-ChildItem -Path $extractFolder
 
-# Start the executable
-$executablePath = Join-Path -Path $extractFolder -ChildPath $executable
-Write-Output "Trying to start the executable at: $executablePath"
+# # Start the executable
+# $executablePath = Join-Path -Path $extractFolder -ChildPath $executable
+# Write-Output "Trying to start the executable at: $executablePath"
 
-#if (Test-Path -Path $executablePath) {
-#    Start-Process -FilePath $executablePath
-#} else {
-#    Write-Error "Executable not found at $executablePath"
-#}
-
-#Pause
-<#
-curl -g -k -L -# -o "C:\Elite\resources\DDU\ddu.bat" "https://github.com/MR-PIxelzen/Windows_Optimisation_Pack/raw/main/ddu.bat" >nul 2>&1
-
-#>
-# create config for msi afterburner
+# make bat
 $MultilineComment = @"
 @echo off
 setlocal EnableDelayedExpansion

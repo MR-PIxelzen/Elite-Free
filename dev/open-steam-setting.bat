@@ -1,0 +1,1 @@
+start steam://open/settings
