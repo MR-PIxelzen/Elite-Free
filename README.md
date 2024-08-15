@@ -1,4 +1,4 @@
 # Elite-Free Pwsh gui 
 
 
-MADE BY [Elite-team](discord.gg/EliteTweaks)
+MADE BY [Elite-team](https://discord.gg/EliteTweaks)
