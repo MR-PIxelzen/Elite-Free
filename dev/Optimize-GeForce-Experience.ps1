@@ -126,7 +126,20 @@ if ($settingElement -ne $null) {
 $xml.Save($xmlFilePath)
 
 }
+function rewards {
+    # Specify the file path
+    $file = "$env:LocalAppData\NVIDIA Corporation\NVIDIA GeForce Experience\*NotificationSettings.dat"  
+
+    # Replace the value of "rewards" from "true" to "false"
+    $currentContent = Get-Content -Path $file
+    $updatedContent = $currentContent -replace '"rewards":\s*true', '"rewards":false'
+    Set-Content -Path $file -Value $updatedContent
+}
+
+# Call the function
+
 Set-ItemProperty -Path "$env:LocalAppData\NVIDIA\NvBackend\config.xml" -Name IsReadOnly -Value $false
+rewards
 EnableQuietMode
 RemoveApplicationScanPaths
 ModifySettings
