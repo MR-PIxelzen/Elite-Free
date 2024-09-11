@@ -1,3 +1,6 @@
 [InternetShortcut]
 URL=steam://nav/games/
-
+IconIndex=0
+HotKey=0
+IDList=
+IconFile=C:\Program Files (x86)\Steam\bin\cef\cef.win7x64\steamwebhelper.exe

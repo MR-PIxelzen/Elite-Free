@@ -9,6 +9,22 @@ Clear-Host
 
 Get-Process | Where-Object { $_.ProcessName -like "*nv*" } | Stop-Process -Force
 
+# Define the pattern to match task names
+#$pattern = "*nv*"
+
+# Get all scheduled tasks
+#$tasks = Get-ScheduledTask
+
+# Filter tasks based on the pattern and disable them
+Get-ScheduledTask | Where-Object { $_.TaskName -like "*nv*" } | ForEach-Object {
+    try {
+        Disable-ScheduledTask -TaskName $_.TaskName -TaskPath $_.TaskPath -Verbose
+        Write-Output "Disabled task: $($_.TaskName)"
+    } catch {
+        Write-Error "Failed to disable task: $($_.TaskName). Error: $_"
+    }
+}
+
 function EnableQuietMode {
     # Path to the XML file
     $xmlFilePath = "C:\ProgramData\NVIDIA Corporation\NvBackend\config.xml"
