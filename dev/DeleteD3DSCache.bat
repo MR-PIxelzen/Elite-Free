@@ -1,6 +1,10 @@
 @echo off
 REM Deletes the D3DSCache directory in the AppData\Local folder
-
+taskkill /F /IM dwm.exe
+taskkill /F /IM explorer.exe
+timeout /t 2 /nobreak > nul
+start dwm.exe
+start explorer.exe
 REM Get the current user's profile path
 set "D3DSCachePath=%UserProfile%\AppData\Local\D3DSCache"
 
